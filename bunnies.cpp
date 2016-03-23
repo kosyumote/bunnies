@@ -6,8 +6,8 @@
 
 #define MAX_BUNNIES_PER_SQUARE 25
 #define MAX_PANTHERS_PER_SQUARE 4
-#define XSIZE 1000
-#define YSIZE 1000
+#define XSIZE 500
+#define YSIZE 300 // these are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
 #define BUNNY_MIGRATION_PROBABILITY 0.06 // this is the probability that a bunny moves to a specific square... if this is 0.06, then the probability of moving is 0.48 and not moving is 0.52
 #define PANTHER_MIGRATION_PROBABILITY 0.1
 #define MAX_STEPS 10000
@@ -22,6 +22,8 @@ int main()
 {
 
     std::mt19937 rand(std::chrono::system_clock::now().time_since_epoch().count()); // random number generator
+    std::chrono::high_resolution_clock::time_point startTime; // for timing how long one step takes
+    std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
 
     //////////////////////////
     // VARIABLE DEFINITIONS //
@@ -89,9 +91,6 @@ int main()
 
     std::uniform_real_distribution<double> realDistribution(0.0, 1.0);
 
-    std::chrono::high_resolution_clock::time_point startTime; // for timing how long one step takes
-    std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
-
     for(int step = 0; step < MAX_STEPS; step++)
     {
 	startTime = endTime;
@@ -103,7 +102,7 @@ int main()
 	
 ///////// MIGRATION STEP (NONTEMP -> TEMP) //////////////
 
-//#pragma omp parallel for collapse(2) num_threads(3)
+#pragma omp parallel for collapse(2) num_threads(3)
 	for(int i = 0; i < XSIZE; i++)
 	{
 	    for(int j = 0; j < YSIZE; j++)
@@ -113,42 +112,42 @@ int main()
 		    double r = realDistribution(rand);
 		    if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // up
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempBunnies[i][(j + YSIZE - 1) % YSIZE]++;
 		    }
 		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // up-right
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempBunnies[(i + 1) % XSIZE][(j + YSIZE - 1) % YSIZE]++;
 		    }
 		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // right
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempBunnies[(i + 1) % XSIZE][j]++;
 		    }
 		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // down-right
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempBunnies[(i + 1) % XSIZE][(j + 1) % YSIZE]++;
 		    }
 		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // down
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempBunnies[i][(j + 1) % YSIZE]++;
 		    }
 		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // down-left
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempBunnies[(i + XSIZE - 1) % XSIZE][(j + 1) % YSIZE]++;
 		    }
 		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // left
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempBunnies[(i + XSIZE - 1) % XSIZE][j]++;
 		    }
 		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // up-left
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempBunnies[(i + XSIZE - 1) % XSIZE][(j + YSIZE - 1) % YSIZE]++;
 		    }
 		    else
@@ -162,42 +161,42 @@ int main()
 		    double r = realDistribution(rand);
 		    if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // up
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempPanthers[i][(j + YSIZE - 1) % YSIZE]++;
 		    }
 		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // up-right
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempPanthers[(i + 1) % XSIZE][(j + YSIZE - 1) % YSIZE]++;
 		    }
 		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // right
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempPanthers[(i + 1) % XSIZE][j]++;
 		    }
 		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // down-right
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempPanthers[(i + 1) % XSIZE][(j + 1) % YSIZE]++;
 		    }
 		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // down
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempPanthers[i][(j + 1) % YSIZE]++;
 		    }
 		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // down-left
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempPanthers[(i + XSIZE - 1) % XSIZE][(j + 1) % YSIZE]++;
 		    }
 		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // left
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempPanthers[(i + XSIZE - 1) % XSIZE][j]++;
 		    }
 		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // up-left
 		    {
-//#pragma omp atomic
+#pragma omp atomic
 			tempPanthers[(i + XSIZE - 1) % XSIZE][(j + YSIZE - 1) % YSIZE]++;
 		    }
 		    else // no migration
@@ -215,7 +214,7 @@ int main()
 	bunnyPopulation = 0;
 	pantherPopulation = 0;
 
-//#pragma omp parallel for collapse(2) num_threads(3)
+#pragma omp parallel for collapse(2) num_threads(3)
 	for(int i = 0; i < XSIZE; i++)
 	{
 	    for(int j = 0; j < YSIZE; j++)
@@ -258,9 +257,9 @@ int main()
 		bunnies[i][j] = std::min(2 * b, MAX_BUNNIES_PER_SQUARE);
 		panthers[i][j] = std::min(u + 2 * f, MAX_PANTHERS_PER_SQUARE);
 
-//#pragma omp atomic
+#pragma omp atomic
 		bunnyPopulation += bunnies[i][j];
-//#pragma omp atomic
+#pragma omp atomic
 		pantherPopulation += panthers[i][j];
 	    }
 	}
