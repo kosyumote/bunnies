@@ -3,14 +3,15 @@
 #include <chrono> // for seeding the random generator with the time
 #include <cstring> // for low-level memory manipulations
 #include <cmath> // for ln(x)
+#include <gif_lib.h> // for making GIF output
 
-#define MAX_BUNNIES_PER_SQUARE 25
-#define MAX_PANTHERS_PER_SQUARE 4
+#define MAX_BUNNIES_PER_SQUARE 1000
+#define MAX_PANTHERS_PER_SQUARE 100
 #define XSIZE 500
 #define YSIZE 300 // these are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
 #define BUNNY_MIGRATION_PROBABILITY 0.06 // this is the probability that a bunny moves to a specific square... if this is 0.06, then the probability of moving is 0.48 and not moving is 0.52
 #define PANTHER_MIGRATION_PROBABILITY 0.1
-#define MAX_STEPS 10000
+#define MAX_STEPS 100
 #define INITIAL_BUNNY_POPULATION 100000
 #define INITIAL_PANTHER_POPULATION 1000
 #define HUNGRY_PANTHER_HUNTING_RATE 0.2
@@ -20,10 +21,13 @@
 
 int main()
 {
-
+    
     std::mt19937 rand(std::chrono::system_clock::now().time_since_epoch().count()); // random number generator
     std::chrono::high_resolution_clock::time_point startTime; // for timing how long one step takes
     std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+
+    ColorMapObject* outputPalette = MakeMapObject(256, NULL); // palette for making GIF output
+    
 
     //////////////////////////
     // VARIABLE DEFINITIONS //
@@ -102,7 +106,7 @@ int main()
 	
 ///////// MIGRATION STEP (NONTEMP -> TEMP) //////////////
 
-#pragma omp parallel for collapse(2) num_threads(3)
+#pragma omp parallel for collapse(2)
 	for(int i = 0; i < XSIZE; i++)
 	{
 	    for(int j = 0; j < YSIZE; j++)
@@ -214,7 +218,7 @@ int main()
 	bunnyPopulation = 0;
 	pantherPopulation = 0;
 
-#pragma omp parallel for collapse(2) num_threads(3)
+#pragma omp parallel for collapse(2)
 	for(int i = 0; i < XSIZE; i++)
 	{
 	    for(int j = 0; j < YSIZE; j++)
@@ -271,6 +275,12 @@ int main()
 	    memset(tempBunnies[i], 0, YSIZE * sizeof(int));
 	    memset(tempPanthers[i], 0, YSIZE * sizeof(int));
 	}
+
+//////////////// DRAW THE PICTURE ////////////////////////////////////////////
+
+	std::vector<GifByteType> r, g, b;
+	
+			    
 
     }
 
