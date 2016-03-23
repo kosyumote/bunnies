@@ -2,6 +2,7 @@
 #include <iostream> // for output
 #include <chrono> // for seeding the random generator with the time
 #include <cstring> // for low-level memory manipulations
+#include <cmath> // for ln(x)
 
 #define MAX_BUNNIES_PER_SQUARE 25
 #define MAX_PANTHERS_PER_SQUARE 4
@@ -9,9 +10,13 @@
 #define YSIZE 1000
 #define BUNNY_MIGRATION_PROBABILITY 0.06 // this is the probability that a bunny moves to a specific square... if this is 0.06, then the probability of moving is 0.48 and not moving is 0.52
 #define PANTHER_MIGRATION_PROBABILITY 0.1
-#define MAX_STEPS 1 //10000
-#define INITIAL_BUNNY_POPULATION 10000
+#define MAX_STEPS 10000
+#define INITIAL_BUNNY_POPULATION 100000
 #define INITIAL_PANTHER_POPULATION 1000
+#define HUNGRY_PANTHER_HUNTING_RATE 0.2
+#define FED_PANTHER_HUNTING_RATE 0.1
+#define HUNGRY_PANTHER_DEATH_RATE 0.1
+#define FED_PANTHER_DEATH_RATE 0.03
 
 int main()
 {
@@ -82,11 +87,19 @@ int main()
     // Run the simulation //
     ////////////////////////
 
-    std::uniform_real_distribution<double> realDistribution(0.0,1.0);
+    std::uniform_real_distribution<double> realDistribution(0.0, 1.0);
+
+    std::chrono::high_resolution_clock::time_point startTime; // for timing how long one step takes
+    std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
 
     for(int step = 0; step < MAX_STEPS; step++)
     {
-	std::cout << "Step " << step + 1 << ":\n    bunny population: " << bunnyPopulation << "\n    panther population: " << pantherPopulation << std::endl; 
+	startTime = endTime;
+	endTime = std::chrono::high_resolution_clock::now();
+	
+	std::chrono::duration<double> timeSpan = std::chrono::duration_cast<std::chrono::duration<double>>(endTime - startTime);
+
+	std::cout << "Step " << step + 1 << " (" << timeSpan.count() << " seconds):\n    bunny population: " << bunnyPopulation << "\n    panther population: " << pantherPopulation << std::endl; 
 	
 ///////// MIGRATION STEP (NONTEMP -> TEMP) //////////////
 
@@ -98,42 +111,42 @@ int main()
 		for(int k = 0; k < bunnies[i][j]; k++)
 		{
 		    double r = realDistribution(rand);
-		    if(r -= BUNNY_MIGRATION_PROBABILITY < 0) // up
+		    if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // up
 		    {
 //#pragma omp atomic
 			tempBunnies[i][(j + YSIZE - 1) % YSIZE]++;
 		    }
-		    else if(r -= BUNNY_MIGRATION_PROBABILITY < 0) // up-right
+		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // up-right
 		    {
 //#pragma omp atomic
 			tempBunnies[(i + 1) % XSIZE][(j + YSIZE - 1) % YSIZE]++;
 		    }
-		    else if(r -= BUNNY_MIGRATION_PROBABILITY < 0) // right
+		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // right
 		    {
 //#pragma omp atomic
 			tempBunnies[(i + 1) % XSIZE][j]++;
 		    }
-		    else if(r -= BUNNY_MIGRATION_PROBABILITY < 0) // down-right
+		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // down-right
 		    {
 //#pragma omp atomic
 			tempBunnies[(i + 1) % XSIZE][(j + 1) % YSIZE]++;
 		    }
-		    else if(r -= BUNNY_MIGRATION_PROBABILITY < 0) // down
+		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // down
 		    {
 //#pragma omp atomic
 			tempBunnies[i][(j + 1) % YSIZE]++;
 		    }
-		    else if(r -= BUNNY_MIGRATION_PROBABILITY < 0) // down-left
+		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // down-left
 		    {
 //#pragma omp atomic
 			tempBunnies[(i + XSIZE - 1) % XSIZE][(j + 1) % YSIZE]++;
 		    }
-		    else if(r -= BUNNY_MIGRATION_PROBABILITY < 0) // left
+		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // left
 		    {
 //#pragma omp atomic
 			tempBunnies[(i + XSIZE - 1) % XSIZE][j]++;
 		    }
-		    else if(r -= BUNNY_MIGRATION_PROBABILITY < 0) // up-left
+		    else if((r -= BUNNY_MIGRATION_PROBABILITY) < 0) // up-left
 		    {
 //#pragma omp atomic
 			tempBunnies[(i + XSIZE - 1) % XSIZE][(j + YSIZE - 1) % YSIZE]++;
@@ -147,42 +160,42 @@ int main()
 		for(int k = 0; k < panthers[i][j]; k++)
 		{
 		    double r = realDistribution(rand);
-		    if(r -= PANTHER_MIGRATION_PROBABILITY < 0) // up
+		    if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // up
 		    {
 //#pragma omp atomic
 			tempPanthers[i][(j + YSIZE - 1) % YSIZE]++;
 		    }
-		    else if(r -= PANTHER_MIGRATION_PROBABILITY < 0) // up-right
+		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // up-right
 		    {
 //#pragma omp atomic
 			tempPanthers[(i + 1) % XSIZE][(j + YSIZE - 1) % YSIZE]++;
 		    }
-		    else if(r -= PANTHER_MIGRATION_PROBABILITY < 0) // right
+		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // right
 		    {
 //#pragma omp atomic
 			tempPanthers[(i + 1) % XSIZE][j]++;
 		    }
-		    else if(r -= PANTHER_MIGRATION_PROBABILITY < 0) // down-right
+		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // down-right
 		    {
 //#pragma omp atomic
 			tempPanthers[(i + 1) % XSIZE][(j + 1) % YSIZE]++;
 		    }
-		    else if(r -= PANTHER_MIGRATION_PROBABILITY < 0) // down
+		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // down
 		    {
 //#pragma omp atomic
 			tempPanthers[i][(j + 1) % YSIZE]++;
 		    }
-		    else if(r -= PANTHER_MIGRATION_PROBABILITY < 0) // down-left
+		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // down-left
 		    {
 //#pragma omp atomic
 			tempPanthers[(i + XSIZE - 1) % XSIZE][(j + 1) % YSIZE]++;
 		    }
-		    else if(r -= PANTHER_MIGRATION_PROBABILITY < 0) // left
+		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // left
 		    {
 //#pragma omp atomic
 			tempPanthers[(i + XSIZE - 1) % XSIZE][j]++;
 		    }
-		    else if(r -= PANTHER_MIGRATION_PROBABILITY < 0) // up-left
+		    else if((r -= PANTHER_MIGRATION_PROBABILITY) < 0) // up-left
 		    {
 //#pragma omp atomic
 			tempPanthers[(i + XSIZE - 1) % XSIZE][(j + YSIZE - 1) % YSIZE]++;
@@ -195,16 +208,69 @@ int main()
 	    }
 	}
 
-////////////////// UPDATE THE NUMBERS OF BUNNIES/PANTHERS (TEMP -> NONTEMP) //////////////////////
 
-	
+
+////////////////// RUN A GILLESPIE SIMULATION ON EACH SQUARE AND UPDATE THE NUMBERS OF BUNNIES/PANTHERS (TEMP -> NONTEMP) //////////////////////
+
+	bunnyPopulation = 0;
+	pantherPopulation = 0;
+
+//#pragma omp parallel for collapse(2) num_threads(3)
+	for(int i = 0; i < XSIZE; i++)
+	{
+	    for(int j = 0; j < YSIZE; j++)
+	    {
+		double t = 0; // simulation time
+		int u = tempPanthers[i][j]; // unfed panthers
+		int f = 0; // fed panthers
+		int b = tempBunnies[i][j]; // number of bunnies
+
+		if(u != 0)
+		{
+		    while(t < 1 && u + f > 0) // for a month, as long as panthers still exist -- otherwise bunnies remain constant
+		    {
+			double tot = HUNGRY_PANTHER_HUNTING_RATE * u * b + FED_PANTHER_HUNTING_RATE * f * b + HUNGRY_PANTHER_DEATH_RATE * u + FED_PANTHER_DEATH_RATE * f;
+			double r = tot * realDistribution(rand);
+			if((r -= HUNGRY_PANTHER_HUNTING_RATE * u * b) < 0)
+			{
+			    b--;
+			    u--;
+			    f++;
+			}
+			else if((r -= FED_PANTHER_HUNTING_RATE * f * b) < 0)
+			{
+			    b--;
+			}
+			else if((r -= HUNGRY_PANTHER_DEATH_RATE * u) < 0)
+			{
+			    u--;
+			}
+			else // if((r -= FED_PANTHER_DEATH_RATE * f) < 0) -- should always be true; no need to check
+			{
+			    f--;
+			}
+			t -= log(realDistribution(rand)) / tot;
+
+			
+		    }
+		}
+
+		bunnies[i][j] = std::min(2 * b, MAX_BUNNIES_PER_SQUARE);
+		panthers[i][j] = std::min(u + 2 * f, MAX_PANTHERS_PER_SQUARE);
+
+//#pragma omp atomic
+		bunnyPopulation += bunnies[i][j];
+//#pragma omp atomic
+		pantherPopulation += panthers[i][j];
+	    }
+	}
 
 ////////////////// CLEAR TEMP ARRAYS ////////////////////////////////////////////
 
 	for(int i = 0; i < XSIZE; i++)
 	{
-	    memset(tempBunnies[i], 0, YSIZE);
-	    memset(tempPanthers[i], 0, YSIZE);
+	    memset(tempBunnies[i], 0, YSIZE * sizeof(int));
+	    memset(tempPanthers[i], 0, YSIZE * sizeof(int));
 	}
 
     }
