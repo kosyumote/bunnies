@@ -31,7 +31,7 @@ void write_output(int** bunnies, int** panthers, int pic)
     for(int i = 0; i < YSIZE; i++)
     {
 	outputPNG[i] = new png_byte[3 * XSIZE];
-    }
+    } 
 
     std::string fileName(OUTPUT_FILENAME);
     fileName = fileName.substr(0, fileName.length() - 4);
@@ -91,6 +91,8 @@ int main()
 
     std::chrono::high_resolution_clock::time_point startTime; // for timing how long one step takes
     std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point completeStartTime = std::chrono::high_resolution_clock::now();
+
     //////////////////////////
     // VARIABLE DEFINITIONS //
     //////////////////////////
@@ -136,7 +138,6 @@ int main()
 	std::binomial_distribution<int> pantherDistribution(MAX_PANTHERS_PER_SQUARE, (double) INITIAL_PANTHER_POPULATION / XSIZE / YSIZE / MAX_PANTHERS_PER_SQUARE);
 	for(int i = 0; i < XSIZE; i++)
 	{
-	    rand.seed(std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - endTime).count() * 10000000 * rand());
 	    for(int j = 0; j < YSIZE; j++)
 	    {
 		bunnies[i][j] = bunnyDistribution(rand);
@@ -292,7 +293,6 @@ int main()
 #pragma omp parallel for collapse(2)
 	for(int i = 0; i < XSIZE; i++)
 	{
-//	    rand.seed(std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - endTime).count() * 100000); // + omp_get_thread_num() * rand());
 	    for(int j = 0; j < YSIZE; j++)
 	    {
 		double t = 0; // simulation time
@@ -354,9 +354,14 @@ int main()
 
     }
 
-//////////////// SAVE THE ANIMATED PNG USING APNGASM ////////////////////////////////////////////
 
-    system("utils/apngasm ./pics/run.apng ./pics/run001.png 1 20");
+    std::chrono::duration<double> simTime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - completeStartTime);
+    std::cout << "\nTotal simulation time: " << simTime.count() << " seconds." << std::endl;
+
+//////////////// SAVE THE ANIMATED PNG USING APNGASM ////////////////////////////////////////////
+    
+    std::cout << "Processing files..." << std::endl;
+    system("utils/apngasm ./pics/run.apng ./pics/run001.png 1 20 > log.txt");
     system("rm ./pics/run*.png");
 
 
