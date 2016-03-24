@@ -2,7 +2,7 @@
 
 debug-flags = -Wall -g
 release-flags = -Ofast
-flags = $(debug-flags) -std=gnu++11 -fopenmp
+flags = $(release-flags) -std=gnu++11 -fopenmp
 
 run: all
 	@echo "Running bunnies simulation:"
