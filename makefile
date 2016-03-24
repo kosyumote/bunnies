@@ -1,7 +1,8 @@
 .PHONY: run all
 
 debug-flags = -Wall -g
-flags = $(debug-flags) -Ofast -std=gnu++11 -fopenmp
+release-flags = -Ofast
+flags = $(debug-flags) -std=gnu++11 -fopenmp
 
 run: all
 	@echo "Running bunnies simulation:"
@@ -11,14 +12,14 @@ all: exec/bunnies
 
 exec/bunnies: objects/bunnies.o | exec
 	@echo "Creating executable..."
-	@g++ $(flags) -o $@ $^ `pkg-config --libs gtk+-3.0`
+	@g++ $(flags) -o $@ $^ -lpng -lz
 
 exec:
 	@mkdir $@
 
 objects/bunnies.o: bunnies.cpp | objects
-	@echo "Compiling bunnies.cpp..."
-	@g++ $(flags) -o $@ -c $^ `pkg-config --cflags gtk+-3.0`
+	@echo "Compiling bunnies.cpp..." 
+	@g++ $(flags) -o $@ -c $^ 
 
 objects:
 	@mkdir $@
