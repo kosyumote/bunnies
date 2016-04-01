@@ -3,7 +3,6 @@
 #include <chrono> // for seeding the random generator with the time
 #include <cstring> // for low-level memory manipulations
 #include <cmath> // for ln(x)
-#include <gif_lib.h> // for making GIF output
 #include <png.h> // for making PNG output
 #include <stdio.h> // for writing to files
 #include <omp.h> // for getting thread id so different threads have different seeds
@@ -12,15 +11,26 @@
 #define MAX_PANTHERS_PER_SQUARE 3
 #define XSIZE 500 // 500 x 300
 #define YSIZE 300 // are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
-#define BUNNY_MIGRATION_PROBABILITY 0.06 // this is the probability that a bunny moves to a specific square... if this is 0.06, then the probability of moving is 0.48 and not moving is 0.52
-#define PANTHER_MIGRATION_PROBABILITY 0.1
-#define MAX_STEPS 100
+#define BUNNY_MIGRATION_PROBABILITY 0.006 // this is the probability that a bunny moves to a specific square... if this is 0.06, then the probability of moving is 0.48 and not moving is 0.52
+#define PANTHER_MIGRATION_PROBABILITY 0.01
+#define MAX_STEPS 997
 #define INITIAL_BUNNY_POPULATION 100000
-#define INITIAL_PANTHER_POPULATION 1000
-#define HUNGRY_PANTHER_HUNTING_RATE 0.2
-#define FED_PANTHER_HUNTING_RATE 0.1
-#define HUNGRY_PANTHER_DEATH_RATE 0.1
-#define FED_PANTHER_DEATH_RATE 0.03
+#define INITIAL_PANTHER_POPULATION 10000
+#define HUNGRY_PANTHER_HUNTING_RATE 0.02
+#define FED_PANTHER_HUNTING_RATE 0.01
+#define HUNGRY_PANTHER_DEATH_RATE 0.01
+#define FED_PANTHER_DEATH_RATE 0.003
+#define TIME_STEP 1 // monthish
+
+#define RANDOM_SEEDING 0
+#define SEEDING_METHOD RANDOM_SEEDING
+
+#define RANDOM_MOVEMENT 0
+#define BUNNIES_RUN_AWAY 1
+#define BUNNIES_NS_PANTHERS_EW 2 // not yet implemented
+#define MIGRATION_METHOD BUNNIES_RUN_AWAY
+
+#define BUNNIES_RUN_AWAY_DAMPENING 0.01 // a positive number -- as it goes to infinity, the model approaches RANDOM_MOVEMENT
 
 #define OUTPUT_FILENAME "./pics/run.png"
 #define FRAME_DELAY 5
@@ -122,9 +132,7 @@ int main()
     // SET INITIAL CONDITIONS SOMEHOW?? //
     //////////////////////////////////////
 
-    int initializationMethod = 0; // change this to pick the initialization method
-
-    switch(initializationMethod)
+    switch(SEEDING_METHOD)
     {
     case 0:
     default:
@@ -171,119 +179,89 @@ int main()
 
 	std::cout << "Step " << step + 1 << " (" << timeSpan.count() << " seconds):\n    bunny population: " << bunnyPopulation << "\n    panther population: " << pantherPopulation << std::endl; 
 	
-///////// MIGRATION STEP (NONTEMP -> TEMP) //////////////
+///////// MIGRATION STEP (NONTEMP -> TEMP) ////////////// to be honest, this whole section should be in a switch (or #if) statement, so that separate migration methods can implement it as efficiently as possible
+#if MIGRATION_METHOD == BUNNIES_RUN_AWAY
+#pragma omp parallel for collapse(2)
+	for(int i = 0; i < XSIZE; i++)
+	{
+	    for(int j = 0; j < YSIZE; j++)
+	    {
+		double migrationFactor = 0;
+		for(int k = 0; k < 8; k++)
+		{
+		    migrationFactor += 1 / (panthers[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] + BUNNIES_RUN_AWAY_DAMPENING);
+		}
+		
+		for(int k = 0; k < 8; k++)
+		{
+		    double bunnyProbability = BUNNY_MIGRATION_PROBABILITY * 8 / (panthers[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] + BUNNIES_RUN_AWAY_DAMPENING) / migrationFactor;
+		    
+		    std::binomial_distribution<int> binomialDistribution(bunnies[i][j], bunnyProbability);
+		    int movers = binomialDistribution(rand);
+
+#pragma omp atomic
+		    tempBunnies[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] += movers; // this line "magically" gets the right direction
+		    bunnies[i][j] -= movers;
+		}
+
+#pragma omp atomic
+		tempBunnies[i][j] += bunnies[i][j];
+	    }
+	}
+
 
 #pragma omp parallel for collapse(2)
 	for(int i = 0; i < XSIZE; i++)
 	{
 	    for(int j = 0; j < YSIZE; j++)
 	    {
-		std::binomial_distribution<int> binomialDistribution = std::binomial_distribution<int>(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
-
-		int bunnyMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempBunnies[i][(j + YSIZE - 1) % YSIZE] += bunnyMovers;
-		bunnies[i][j] -= bunnyMovers;
-		binomialDistribution = std::binomial_distribution<int>(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
-		bunnyMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempBunnies[(i + 1) % XSIZE][(j + YSIZE - 1) % YSIZE] += bunnyMovers;
-		bunnies[i][j] -= bunnyMovers;
-		binomialDistribution = std::binomial_distribution<int>(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
-
-		bunnyMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempBunnies[(i + 1) % XSIZE][j % YSIZE] += bunnyMovers;
-		bunnies[i][j] -= bunnyMovers;
-		binomialDistribution = std::binomial_distribution<int>(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
-
-		bunnyMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempBunnies[(i + 1) % XSIZE][(j + 1) % YSIZE] += bunnyMovers;
-		bunnies[i][j] -= bunnyMovers;
-		binomialDistribution = std::binomial_distribution<int>(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
-
-		bunnyMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempBunnies[i][(j + 1) % YSIZE] += bunnyMovers;
-		bunnies[i][j] -= bunnyMovers;
-		binomialDistribution = std::binomial_distribution<int>(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
-
-		bunnyMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempBunnies[(i + XSIZE - 1) % XSIZE][(j + 1) % YSIZE] += bunnyMovers;
-		bunnies[i][j] -= bunnyMovers;
-		binomialDistribution = std::binomial_distribution<int>(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
-
-		bunnyMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempBunnies[(i + XSIZE - 1) % XSIZE][j % YSIZE] += bunnyMovers;
-		bunnies[i][j] -= bunnyMovers;
-		binomialDistribution = std::binomial_distribution<int>(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
-
-		bunnyMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempBunnies[(i + XSIZE - 1) % XSIZE][(j + YSIZE - 1) % YSIZE] += bunnyMovers;
-		bunnies[i][j] -= bunnyMovers;
+		for(int k = 0; k < 8; k++)
+		{
+		    std::binomial_distribution<int> binomialDistribution(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
+		    int movers = binomialDistribution(rand);
 
 #pragma omp atomic
-		tempBunnies[i][j] += bunnies[i][j];
-
-
-		binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
-
-		int pantherMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempPanthers[i][(j + YSIZE - 1) % YSIZE] += pantherMovers;
-		panthers[i][j] -= pantherMovers;
-		binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
-		pantherMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempPanthers[(i + 1) % XSIZE][(j + YSIZE - 1) % YSIZE] += pantherMovers;
-		panthers[i][j] -= pantherMovers;
-		binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
-
-		pantherMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempPanthers[(i + 1) % XSIZE][j % YSIZE] += pantherMovers;
-		panthers[i][j] -= pantherMovers;
-		binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
-
-		pantherMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempPanthers[(i + 1) % XSIZE][(j + 1) % YSIZE] += pantherMovers;
-		panthers[i][j] -= pantherMovers;
-		binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
-
-		pantherMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempPanthers[i][(j + 1) % YSIZE] += pantherMovers;
-		panthers[i][j] -= pantherMovers;
-		binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
-
-		pantherMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempPanthers[(i + XSIZE - 1) % XSIZE][(j + 1) % YSIZE] += pantherMovers;
-		panthers[i][j] -= pantherMovers;
-		binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
-
-		pantherMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempPanthers[(i + XSIZE - 1) % XSIZE][j % YSIZE] += pantherMovers;
-		panthers[i][j] -= pantherMovers;
-		binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
-
-		pantherMovers = binomialDistribution(rand);
-#pragma omp atomic
-		tempPanthers[(i + XSIZE - 1) % XSIZE][(j + YSIZE - 1) % YSIZE] += pantherMovers;
-		panthers[i][j] -= pantherMovers;
+		    tempPanthers[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] += movers;
+		    panthers[i][j] -= movers;
+		}
 
 #pragma omp atomic
 		tempPanthers[i][j] += panthers[i][j];
+
 	    }
 	}
 
+#else // this is the default, or when MIGRATION_METHOD == RANDOM_MOTION
+#pragma omp parallel for collapse(2)
+	for(int i = 0; i < XSIZE; i++)
+	{
+	    for(int j = 0; j < YSIZE; j++)
+	    {
+		for(int k = 0; k < 8; k++)
+		{
+		    std::binomial_distribution<int> binomialDistribution(bunnies[i][j], BUNNY_MIGRATION_PROBABILITY);
+		    int movers = binomialDistribution(rand);
 
+#pragma omp atomic
+		    tempBunnies[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] += movers; // this line "magically" gets the right direction
+		    bunnies[i][j] -= movers;
+		    
+		    binomialDistribution = std::binomial_distribution<int>(panthers[i][j], PANTHER_MIGRATION_PROBABILITY);
+		    movers = binomialDistribution(rand);
+
+#pragma omp atomic
+		    tempPanthers[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] += movers;
+		    panthers[i][j] -= movers;
+		}
+
+#pragma omp atomic
+		tempBunnies[i][j] += bunnies[i][j];
+#pragma omp atomic
+		tempPanthers[i][j] += panthers[i][j];
+
+	    }
+	}
+#endif
 
 ////////////////// RUN A GILLESPIE SIMULATION ON EACH SQUARE AND UPDATE THE NUMBERS OF BUNNIES/PANTHERS (TEMP -> NONTEMP) //////////////////////
 
@@ -302,7 +280,7 @@ int main()
 
 		if(u != 0)
 		{
-		    while(t < 1 && u + f > 0) // for a month, as long as panthers still exist -- otherwise bunnies remain constant
+		    while(t < TIME_STEP && u + f > 0) // for a month, as long as panthers still exist -- otherwise bunnies remain constant
 		    {
 			double tot = HUNGRY_PANTHER_HUNTING_RATE * u * b + FED_PANTHER_HUNTING_RATE * f * b + HUNGRY_PANTHER_DEATH_RATE * u + FED_PANTHER_DEATH_RATE * f;
 			double r = tot * realDistribution(rand);
