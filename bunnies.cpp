@@ -3,31 +3,49 @@
 #include <chrono> // for seeding the random generator with the time
 #include <cstring> // for low-level memory manipulations
 #include <cmath> // for ln(x)
-#include <gif_lib.h> // for making GIF output
 #include <png.h> // for making PNG output
 #include <stdio.h> // for writing to files
-#include <omp.h> // for getting thread id so different threads have different seeds
+#include <unistd.h> // for sleeping a thread
+#include <csignal> // for handling ctrl+C properly
+
 
 #define MAX_BUNNIES_PER_SQUARE 10
 #define MAX_PANTHERS_PER_SQUARE 3
 #define XSIZE 500 // 500 x 300
 #define YSIZE 300 // are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
 #define BUNNY_MIGRATION_PROBABILITY 0.06 // this is the probability that a bunny moves to a specific square... if this is 0.06, then the probability of moving is 0.48 and not moving is 0.52
-#define PANTHER_MIGRATION_PROBABILITY 0.1
+#define PANTHER_MIGRATION_PROBABILITY 0.01
 #define MAX_STEPS 100
-#define INITIAL_BUNNY_POPULATION 100000
-#define INITIAL_PANTHER_POPULATION 1000
-#define HUNGRY_PANTHER_HUNTING_RATE 0.2
+#define INITIAL_BUNNY_POPULATION 834000//1457000
+#define INITIAL_PANTHER_POPULATION 335000//280000
+#define HUNGRY_PANTHER_HUNTING_RATE 1
 #define FED_PANTHER_HUNTING_RATE 0.1
-#define HUNGRY_PANTHER_DEATH_RATE 0.1
+#define HUNGRY_PANTHER_DEATH_RATE .5
 #define FED_PANTHER_DEATH_RATE 0.03
 
 #define OUTPUT_FILENAME "./pics/run.png"
-#define FRAME_DELAY 5
+#define FRAME_RATE 25
+#define DELETE_INTERMEDIATES true
+
+void sig_int_handler(int sig)
+{
+    std::cout << "\nGot interrupt!\nAborting..." << std::endl;
+    if(DELETE_INTERMEDIATES)
+    {
+	if(system("rm ./pics/run*.png"))
+	{
+	    std::cout << "Error removing intermediate files." << std::endl;
+	}
+    }
+    std::cout << "\e[?25h" << std::endl;
+    signal(SIGINT, SIG_DFL);
+    kill(getpid(), SIGINT);
+}
 
 void write_output(int** bunnies, int** panthers, int pic)
 {
-    png_byte **outputPNG = new png_byte*[YSIZE]; //[XSIZE][YSIZE];
+    png_byte **outputPNG;
+    outputPNG = new png_byte*[YSIZE]; //[XSIZE][YSIZE];
     for(int i = 0; i < YSIZE; i++)
     {
 	outputPNG[i] = new png_byte[3 * XSIZE];
@@ -87,6 +105,9 @@ void write_output(int** bunnies, int** panthers, int pic)
 
 int main()
 {
+    signal(SIGINT, sig_int_handler); // to let us turn cursor back on / cleanup after ctrl+C
+    std::cout << "\e[?25l"; // turn off cursor so it doesn't annoy us
+
     std::mt19937 rand(std::chrono::system_clock::now().time_since_epoch().count());
 
     std::chrono::high_resolution_clock::time_point startTime; // for timing how long one step takes
@@ -360,10 +381,64 @@ int main()
 
 //////////////// SAVE THE ANIMATED PNG USING APNGASM ////////////////////////////////////////////
     
-    std::cout << "Processing files..." << std::endl;
-    system("utils/apngasm ./pics/run.apng ./pics/run001.png 1 20 > log.txt");
-    system("rm ./pics/run*.png");
+    bool done = false;
+    int error = 0;
+#pragma omp parallel num_threads(2)
+    {
 
+#pragma omp single nowait
+	{
+	    int count = 0;
+	    std::cout << "Processing files" << std::flush;
+	    sleep(1);
+	    std::cout << "." << std::flush;
+	    while(!done)
+	    {
+		sleep(1);		
+		count++;
+		if(count % 3 == 0)
+		{
+		    std::cout << "\b\b  \b\b" << std::flush;
+		}
+		else
+		{
+		    std::cout << "." << std::flush;
+		}
+	    }
+	    for(int i = 0; i < 2 - count % 3; i++)
+	    {
+		std::cout << ".";
+	    }
+	    std::cout << " done!\e[?25h\n" << std::endl; // turn cursor back on
+	}
+
+#pragma omp single
+	{
+	    std::string command("utils/apngasm ");
+	    if(system("utils/apngasm ./pics/run.apng ./pics/run001.png 1 20 > log.txt"))
+	    {
+		error++;
+	    }
+	    if(DELETE_INTERMEDIATES)
+	    {
+		if(system("rm ./pics/run*.png"))
+		{
+		    error += 2;
+		}
+	    }
+	    done = true;
+#pragma omp flush(done)
+	}
+    }
+
+    if(error % 2)
+    {
+	std::cout << "Problem converting files to animated png." << std::endl;
+    }
+    if(error >= 2)
+    {
+	std::cout << "Error removing intermediate files." << std::endl;
+    }
 
     ////////////////////////////////////////////////
     // DEALLOCATE MEMORY FOR BUNNY/PANTHER ARRAYS //
