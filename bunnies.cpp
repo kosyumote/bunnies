@@ -45,6 +45,7 @@
 
 #define OUTPUT_FILENAME "./pics/run.apng" // any filename that has an extension should work... if the filename does not have a "." in its name, the program will not work correctly
 #define FRAME_RATE 25
+#define LOOP_ANIMATION false
 #define DELETE_INTERMEDIATES true
 
 
@@ -549,7 +550,11 @@ int main()
 	    command = command.substr(0, command.find_last_of('.'));
 	    command += std::string("001.png 1 ");
 	    command += std::to_string(FRAME_RATE);
-	    command += std::string("> log.txt.");
+	    if(!LOOP_ANIMATION)
+	    {
+		command += std::string(" -l1");
+	    }
+	    command += std::string(" > log.txt.");
 		
 	    if(system(command.c_str()))
 	    {
