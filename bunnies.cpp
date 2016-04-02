@@ -15,9 +15,9 @@
 #define YSIZE 300 // are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
 #define BUNNY_MIGRATION_PROBABILITY 0.06 // this is the probability that a bunny moves to a specific square... if this is 0.06, then the probability of moving is 0.48 and not moving is 0.52
 #define PANTHER_MIGRATION_PROBABILITY 0.1
-#define MAX_STEPS 50
-#define INITIAL_BUNNY_POPULATION 100000
-#define INITIAL_PANTHER_POPULATION 10000
+#define MAX_STEPS 500
+#define INITIAL_BUNNY_POPULATION 10//100000
+#define INITIAL_PANTHER_POPULATION 0//10000
 #define HUNGRY_PANTHER_HUNTING_RATE 0.02
 #define FED_PANTHER_HUNTING_RATE 0.01
 #define HUNGRY_PANTHER_DEATH_RATE 0.01
@@ -45,9 +45,10 @@
 
 #define OUTPUT_FILENAME "./pics/run.apng" // any filename that has an extension should work... if the filename does not have a "." in its name, the program will not work correctly
 #define FRAME_RATE 25
-#define LOOP_ANIMATION false
+#define LOOP_ANIMATION true
+#define LOOP_ANIMATION_DELAY 1 // in seconds -- only meaningful if LOOP_ANIMATION is true
 #define DELETE_INTERMEDIATES true
-
+#define FILE_COMPRESSIONS 0 // non-negative integer -- default is 15, lower numbers make slightly larger files slightly more quickly
 
 void sig_int_handler(int sig)
 {
@@ -98,8 +99,8 @@ void write_output(int** bunnies, int** panthers, int pic)
     {
 	for(int j = 0; j < YSIZE; j++)
 	{
-	    int bunnyNumber = 256 * bunnies[i][j] / (MAX_BUNNIES_PER_SQUARE + 1);
-	    int pantherNumber = 256 * panthers[i][j] / (MAX_PANTHERS_PER_SQUARE + 1); 
+	    int bunnyNumber = std::min(255, 256 * bunnies[i][j] / (MAX_BUNNIES_PER_SQUARE + 1));
+	    int pantherNumber = std::min(255, 256 * panthers[i][j] / (MAX_PANTHERS_PER_SQUARE + 1)); 
 	    if(bunnyNumber > pantherNumber)
 	    {
 		outputPNG[j][3 * i] = 255;
@@ -554,7 +555,23 @@ int main()
 	    {
 		command += std::string(" -l1");
 	    }
-	    command += std::string(" > log.txt.");
+	    else if(LOOP_ANIMATION_DELAY != 0)
+	    {
+		std::string fileName(OUTPUT_FILENAME);
+		fileName = fileName.substr(0, fileName.find_last_of('.'));
+		std::string fileNameAppender = std::to_string(MAX_STEPS + 1);
+		fileNameAppender = fileNameAppender.insert(0, 3 - fileNameAppender.length(), '0');
+		fileName += fileNameAppender;
+		fileName += ".txt";
+	
+		FILE *delayer = fopen(fileName.c_str(), "w");
+		fprintf(delayer, "delay=%d/100", (int) LOOP_ANIMATION_DELAY*100);
+		fclose(delayer);
+	    }
+
+	    command += std::string(" -i");
+	    command += std::to_string(FILE_COMPRESSIONS);
+	    command += std::string(" > log.txt");
 		
 	    if(system(command.c_str()))
 	    {
@@ -565,8 +582,10 @@ int main()
 		std::string command("rm ");
 		command += std::string(OUTPUT_FILENAME);
 		command = command.substr(0, command.find_last_of('.'));
+		std::string command2(command);
 		command += std::string("*.png");
-		if(system(command.c_str()))
+		command2 += std::string("*.txt");
+		if(system(command.c_str()) + system(command2.c_str())) // if there's an error in either one
 		{
 		    error += 2;
 		}
@@ -584,6 +603,9 @@ int main()
     {
 	std::cout << "Error removing intermediate files." << std::endl;
     }
+
+    std::chrono::duration<double> outputTime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - completeStartTime);
+    std::cout << "Processing time: " << outputTime.count() - simTime.count() << " seconds.\n" << std::endl;
 
 ////////////////////////////////////////////////
 // DEALLOCATE MEMORY FOR BUNNY/PANTHER ARRAYS //
