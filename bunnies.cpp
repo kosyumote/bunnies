@@ -15,7 +15,7 @@
 #define YSIZE 300 // are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
 #define BUNNY_MIGRATION_PROBABILITY 0.6 // this is the total probability that a bunny moves to a specific square... if this is 0.6, and the default movement method is used, then each direction has a 15% chance
 #define PANTHER_MIGRATION_PROBABILITY 0.8
-#define MAX_STEPS 200
+#define MAX_STEPS 500
 #define INITIAL_BUNNY_POPULATION 10//100000
 #define INITIAL_PANTHER_POPULATION 0//10000
 #define HUNGRY_PANTHER_HUNTING_RATE 0.02
@@ -23,7 +23,7 @@
 #define HUNGRY_PANTHER_DEATH_RATE 0.01
 #define FED_PANTHER_DEATH_RATE 0.003
 #define TIME_STEP 1 // monthish
-#define BUNNY_BIRTH_RATE 1 // only meaningful if SIMULATION_METHOD is LOG_DEATH_AND_BIRTH or EXP_DEATH_AND_BIRTH
+#define BUNNY_BIRTH_RATE 0.0001 // only meaningful if SIMULATION_METHOD is a DEATH_AND_BIRTH type -- I think it should be around TIME_STEP / MAX_BUNNIES_PER_SQUARE... not sure though... maybe TIME_STEP / MAX_BUNNIES_PER_SQUARE^2??
 #define PANTHER_BIRTH_RATE .1 // as above -- also only fed panthers reproduce
 #define BUNNY_OVERCROWDING_DIFFICULTY 4 // how bad is it for having too many bunnies (should be a positive number... 4 is pretty hard, while 1 or .5 is pretty lenient)
 #define PANTHER_OVERCROWDING_DIFFICULTY 4 // these are only meaningful for EXP_DEATH_AND_BIRTH
@@ -36,12 +36,13 @@
 #define RANDOM_MOVEMENT_EIGHT_WAYS 2 // works
 #define MIGRATION_METHOD RANDOM_MOVEMENT_AVERAGE
 
-#define MOVEMENT_AVERAGE_DAMPENING .17 // the ratio that diagonals have to straight directions -- if this is 0, the model reduces to FOUR_WAYS, if this is 1, the model reduces to EIGHT_WAYS; as this goes to infinity, the bunnies will move solely in diagonals (making a square pattern)
+#define MOVEMENT_AVERAGE_DAMPENING .17 // the ratio that diagonals have to straight directions -- if this is 0, the model reduces to FOUR_WAYS, if this is 1, the model reduces to EIGHT_WAYS; as this goes to infinity, the bunnies will move solely in diagonals (making a square pattern) -- I think that maybe setting this to the migration rate / 4 might work better?
 
 #define BIRTH_AFTER_DEATH 0 
-#define LOG_DEATH_AND_BIRTH 1
-#define EXP_DEATH_AND_BIRTH 2
-#define SIMULATION_METHOD EXP_DEATH_AND_BIRTH
+#define LOGISTIC_DEATH_AND_BIRTH 1
+#define GOMPERTZ_DEATH_AND_BIRTH 2
+#define LOG_LOGISTIC_DEATH_AND_BIRTH 3 // not yet implemented
+#define SIMULATION_METHOD GOMPERTZ_DEATH_AND_BIRTH
 
 #define OUTPUT_FILENAME "./pics/run.apng" // any filename that has an extension should work... if the filename does not have a "." in its name, the program will not work correctly
 #define FRAME_RATE 25
@@ -309,7 +310,7 @@ int main()
 
 ////////////////// RUN A GILLESPIE SIMULATION ON EACH SQUARE AND UPDATE THE NUMBERS OF BUNNIES/PANTHERS (TEMP -> NONTEMP) //////////////////////
 
-#if SIMULATION_METHOD == LOG_DEATH_AND_BIRTH
+#if SIMULATION_METHOD == LOGISTIC_DEATH_AND_BIRTH
 	bunnyPopulation = 0;
 	pantherPopulation = 0;
 
@@ -323,19 +324,34 @@ int main()
 		int f = 0; // fed panthers
 		int b = tempBunnies[i][j]; // number of bunnies
 
-		double tot = BUNNY_BIRTH_RATE * b * log((MAX_BUNNIES_PER_SQUARE + 1) / (b + 1)) + PANTHER_BIRTH_RATE * f * log((MAX_PANTHERS_PER_SQUARE + 1) / (u + f + 1)) + HUNGRY_PANTHER_HUNTING_RATE * u * b + FED_PANTHER_HUNTING_RATE * f * b + HUNGRY_PANTHER_DEATH_RATE * u + FED_PANTHER_DEATH_RATE * f;
+		double tot = BUNNY_BIRTH_RATE * MAX_BUNNIES_PER_SQUARE * b + BUNNY_BIRTH_RATE * b * b + PANTHER_BIRTH_RATE * MAX_PANTHERS_PER_SQUARE * f +  PANTHER_BIRTH_RATE * (u + f) * (u + f) + HUNGRY_PANTHER_HUNTING_RATE * u * b + FED_PANTHER_HUNTING_RATE * f * b + HUNGRY_PANTHER_DEATH_RATE * u + FED_PANTHER_DEATH_RATE * f;
 		while(t < TIME_STEP && tot > 0)
 		{
 		    double r = tot * realDistribution(rand);
 
-		    if((r -= BUNNY_BIRTH_RATE * b * log((MAX_BUNNIES_PER_SQUARE + 1) / (b + 1))) < 0)
+		    if((r -= BUNNY_BIRTH_RATE * MAX_BUNNIES_PER_SQUARE * b) < 0)
 		    {
 			b++;
 		    }
-		    else if((r -= PANTHER_BIRTH_RATE * f * log((MAX_PANTHERS_PER_SQUARE + 1) / (u + f + 1))) < 0)
+		    else if((r -= BUNNY_BIRTH_RATE * b * b) < 0)
+		    {
+			b--;
+		    }
+		    else if((r -= PANTHER_BIRTH_RATE * MAX_PANTHERS_PER_SQUARE * f) < 0)
 		    {
 			f--;
 			u += 2;
+		    }
+		    else if((r -= PANTHER_BIRTH_RATE * (u + f) * (u + f)) < 0)
+		    {
+			if(realDistribution(rand) < f / ((double)(u + f))) // kill off one panther at random
+			{
+			    f--;
+			}
+			else
+			{
+			    u--;
+			}
 		    }
 		    else if((r -= HUNGRY_PANTHER_HUNTING_RATE * u * b) < 0)
 		    {
@@ -357,7 +373,84 @@ int main()
 		    }
 		    t -= log(realDistribution(rand)) / tot;	
 
-		    tot = BUNNY_BIRTH_RATE * b * log((MAX_BUNNIES_PER_SQUARE + 1) / (b + 1)) + PANTHER_BIRTH_RATE * f * log((MAX_PANTHERS_PER_SQUARE + 1) / (u + f + 1)) + HUNGRY_PANTHER_HUNTING_RATE * u * b + FED_PANTHER_HUNTING_RATE * f * b + HUNGRY_PANTHER_DEATH_RATE * u + FED_PANTHER_DEATH_RATE * f;
+		    tot = BUNNY_BIRTH_RATE * MAX_BUNNIES_PER_SQUARE * b + BUNNY_BIRTH_RATE * b * b + PANTHER_BIRTH_RATE * MAX_PANTHERS_PER_SQUARE * f +  PANTHER_BIRTH_RATE * (u + f) * (u + f) + HUNGRY_PANTHER_HUNTING_RATE * u * b + FED_PANTHER_HUNTING_RATE * f * b + HUNGRY_PANTHER_DEATH_RATE * u + FED_PANTHER_DEATH_RATE * f;
+		}
+
+		bunnies[i][j] = b;
+		panthers[i][j] = u + f;
+
+#pragma omp atomic
+		bunnyPopulation += bunnies[i][j];
+#pragma omp atomic
+		pantherPopulation += panthers[i][j];
+	    }
+	}
+#elif SIMULATION_METHOD == GOMPERTZ_DEATH_AND_BIRTH
+	bunnyPopulation = 0;
+	pantherPopulation = 0;
+
+#pragma omp parallel for collapse(2)
+	for(int i = 0; i < XSIZE; i++)
+	{
+	    for(int j = 0; j < YSIZE; j++)
+	    {
+		double t = 0; // simulation time
+		int u = tempPanthers[i][j]; // unfed panthers
+		int f = 0; // fed panthers
+		int b = tempBunnies[i][j]; // number of bunnies
+
+		double tot = BUNNY_BIRTH_RATE * log(MAX_BUNNIES_PER_SQUARE + 1) * b + BUNNY_BIRTH_RATE * log(b + 1) * b +  PANTHER_BIRTH_RATE * log(MAX_PANTHERS_PER_SQUARE + 1) * f + PANTHER_BIRTH_RATE * log(u + f + 1) * (u + f) + HUNGRY_PANTHER_HUNTING_RATE * u * b + FED_PANTHER_HUNTING_RATE * f * b + HUNGRY_PANTHER_DEATH_RATE * u + FED_PANTHER_DEATH_RATE * f;
+
+		while(t < TIME_STEP && tot > 0)
+		{
+		    double r = tot * realDistribution(rand);
+
+		    if((r -= BUNNY_BIRTH_RATE * log(MAX_BUNNIES_PER_SQUARE + 1) * b) < 0)
+		    {
+			b++;
+		    }
+		    else if((r -= BUNNY_BIRTH_RATE * log(b + 1) * b) < 0)
+		    {
+			b--;
+		    }
+		    else if((r -= PANTHER_BIRTH_RATE * log(MAX_PANTHERS_PER_SQUARE + 1) * f) < 0)
+		    {
+			f--;
+			u += 2;
+		    }
+		    else if((r -= PANTHER_BIRTH_RATE * log(u + f + 1) * (u + f)) < 0)
+		    {
+			if(realDistribution(rand) < f / ((double)(u + f))) // kill off one panther at random
+			{
+			    f--;
+			}
+			else
+			{
+			    u--;
+			}
+		    }
+		    else if((r -= HUNGRY_PANTHER_HUNTING_RATE * u * b) < 0)
+		    {
+			b--;
+			u--;
+			f++;
+		    }
+		    else if((r -= FED_PANTHER_HUNTING_RATE * f * b) < 0)
+		    {
+			b--;
+		    }
+		    else if((r -= HUNGRY_PANTHER_DEATH_RATE * u) < 0)
+		    {
+			u--;
+		    }
+		    else // if((r -= FED_PANTHER_DEATH_RATE * f) < 0) -- should always be true; no need to check
+		    {
+			f--;
+		    }
+		    t -= log(realDistribution(rand)) / tot;	
+		    
+
+		    tot = BUNNY_BIRTH_RATE * log(MAX_BUNNIES_PER_SQUARE + 1) * b + BUNNY_BIRTH_RATE * log(b + 1) * b +  PANTHER_BIRTH_RATE * log(MAX_PANTHERS_PER_SQUARE + 1) * f + PANTHER_BIRTH_RATE * log(u + f + 1) * (u + f) + HUNGRY_PANTHER_HUNTING_RATE * u * b + FED_PANTHER_HUNTING_RATE * f * b + HUNGRY_PANTHER_DEATH_RATE * u + FED_PANTHER_DEATH_RATE * f;
 		}
 
 		bunnies[i][j] = b;
@@ -370,7 +463,7 @@ int main()
 	    }
 	}
 
-#elif SIMULATION_METHOD == EXP_DEATH_AND_BIRTH
+#elif SIMULATION_METHOD == LOG_LOGISTIC_DEATH_AND_BIRTH
 	bunnyPopulation = 0;
 	pantherPopulation = 0;
 
