@@ -11,22 +11,22 @@
 
 #define MAX_BUNNIES_PER_SQUARE 100
 #define MAX_PANTHERS_PER_SQUARE 30
+#define BUNNY_COLOR_STRENGTH 3 // this makes it easy to make the colors more vibrant if your simulation has equilibrium numbers significantly lower than the max allowed per square
+#define PANTHER_COLOR_STRENGTH 3 // this should be 1 by default, and increased to make the colors more visible
 #define XSIZE 500 // 500 x 300
 #define YSIZE 300 // are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
-#define BUNNY_MIGRATION_PROBABILITY 0.6 // this is the total probability that a bunny moves to a specific square... if this is 0.6, and the default movement method is used, then each direction has a 15% chance
+#define BUNNY_MIGRATION_PROBABILITY 0.1 // this is the total probability that a bunny moves to a specific square... if this is 0.6, and the default movement method is used, then each direction has a 15% chance
 #define PANTHER_MIGRATION_PROBABILITY 0.8
-#define MAX_STEPS 500
-#define INITIAL_BUNNY_POPULATION 10//100000
-#define INITIAL_PANTHER_POPULATION 0//10000
-#define HUNGRY_PANTHER_HUNTING_RATE 0.02
+#define MAX_STEPS 200
+#define INITIAL_BUNNY_POPULATION 10
+#define INITIAL_PANTHER_POPULATION 0
+#define HUNGRY_PANTHER_HUNTING_RATE 0.2
 #define FED_PANTHER_HUNTING_RATE 0.01
-#define HUNGRY_PANTHER_DEATH_RATE 0.01
-#define FED_PANTHER_DEATH_RATE 0.003
+#define HUNGRY_PANTHER_DEATH_RATE 0.1
+#define FED_PANTHER_DEATH_RATE 0.03
 #define TIME_STEP 1 // monthish
 #define BUNNY_BIRTH_RATE 0.0001 // only meaningful if SIMULATION_METHOD is a DEATH_AND_BIRTH type -- I think it should be around TIME_STEP / MAX_BUNNIES_PER_SQUARE... not sure though... maybe TIME_STEP / MAX_BUNNIES_PER_SQUARE^2??
-#define PANTHER_BIRTH_RATE .1 // as above -- also only fed panthers reproduce
-#define BUNNY_OVERCROWDING_DIFFICULTY 4 // how bad is it for having too many bunnies (should be a positive number... 4 is pretty hard, while 1 or .5 is pretty lenient)
-#define PANTHER_OVERCROWDING_DIFFICULTY 4 // these are only meaningful for EXP_DEATH_AND_BIRTH
+#define PANTHER_BIRTH_RATE .1 // as above -- also only fed panthers reproduce, so this number should be higher? -- also since the deathrate is dependent on this, making it too big is bad... maybe we need to have separate death rate??
 
 #define RANDOM_SEEDING 0
 #define SEEDING_METHOD RANDOM_SEEDING
@@ -42,9 +42,9 @@
 #define LOGISTIC_DEATH_AND_BIRTH 1
 #define GOMPERTZ_DEATH_AND_BIRTH 2
 #define LOG_LOGISTIC_DEATH_AND_BIRTH 3 // not yet implemented
-#define SIMULATION_METHOD GOMPERTZ_DEATH_AND_BIRTH
+#define SIMULATION_METHOD LOGISTIC_DEATH_AND_BIRTH
 
-#define OUTPUT_FILENAME "./pics/run.apng" // any filename that has an extension should work... if the filename does not have a "." in its name, the program will not work correctly
+#define OUTPUT_FILENAME "./pics/run.apng" // any filename that has an extension other than .png or .txt should work... if the filename does not have a "." in its name, the program will not work correctly
 #define FRAME_RATE 25
 #define LOOP_ANIMATION true
 #define LOOP_ANIMATION_DELAY 1 // in seconds -- only meaningful if LOOP_ANIMATION is true
@@ -100,8 +100,8 @@ void write_output(int** bunnies, int** panthers, int pic)
     {
 	for(int j = 0; j < YSIZE; j++)
 	{
-	    int bunnyNumber = std::min(255, 256 * bunnies[i][j] / (MAX_BUNNIES_PER_SQUARE + 1));
-	    int pantherNumber = std::min(255, 256 * panthers[i][j] / (MAX_PANTHERS_PER_SQUARE + 1)); 
+	    int bunnyNumber = std::min(255, 256 * BUNNY_COLOR_STRENGTH * bunnies[i][j] / (MAX_BUNNIES_PER_SQUARE + 1));
+	    int pantherNumber = std::min(255, 256 * PANTHER_COLOR_STRENGTH * panthers[i][j] / (MAX_PANTHERS_PER_SQUARE + 1)); 
 	    if(bunnyNumber > pantherNumber)
 	    {
 		outputPNG[j][3 * i] = 255;
