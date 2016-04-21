@@ -13,19 +13,19 @@
 #define MAX_PANTHERS_PER_SQUARE 30
 #define BUNNY_COLOR_STRENGTH 3 // this makes it easy to make the colors more vibrant if your simulation has equilibrium numbers significantly lower than the max allowed per square
 #define PANTHER_COLOR_STRENGTH 3 // this should be 1 by default, and increased to make the colors more visible
-#define XSIZE 500 // 500 x 300
-#define YSIZE 300 // are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
-#define BUNNY_MIGRATION_PROBABILITY 0.1 // this is the total probability that a bunny moves to a specific square... if this is 0.6, and the default movement method is used, then each direction has a 15% chance
+#define XSIZE 250 // 500 x 300
+#define YSIZE 150 // are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
+#define BUNNY_MIGRATION_PROBABILITY 0.6 // this is the total probability that a bunny moves to a specific square... if this is 0.6, and the default movement method is used, then each direction has a 15% chance
 #define PANTHER_MIGRATION_PROBABILITY 0.8
-#define MAX_STEPS 200
-#define INITIAL_BUNNY_POPULATION 10
-#define INITIAL_PANTHER_POPULATION 0
+#define MAX_STEPS 500
+#define INITIAL_BUNNY_POPULATION (XSIZE * YSIZE * MAX_BUNNIES_PER_SQUARE * 0.5)
+#define INITIAL_PANTHER_POPULATION (XSIZE * YSIZE * MAX_PANTHERS_PER_SQUARE * 0.9)
 #define HUNGRY_PANTHER_HUNTING_RATE 0.2
-#define FED_PANTHER_HUNTING_RATE 0.01
-#define HUNGRY_PANTHER_DEATH_RATE 0.1
-#define FED_PANTHER_DEATH_RATE 0.03
+#define FED_PANTHER_HUNTING_RATE 0.05 // .01
+#define HUNGRY_PANTHER_DEATH_RATE 0.1 // .1
+#define FED_PANTHER_DEATH_RATE 0.01 // .03
 #define TIME_STEP 1 // monthish
-#define BUNNY_BIRTH_RATE 0.0001 // only meaningful if SIMULATION_METHOD is a DEATH_AND_BIRTH type -- I think it should be around TIME_STEP / MAX_BUNNIES_PER_SQUARE... not sure though... maybe TIME_STEP / MAX_BUNNIES_PER_SQUARE^2??
+#define BUNNY_BIRTH_RATE 0.1 // only meaningful if SIMULATION_METHOD is a DEATH_AND_BIRTH type -- I think it should be around TIME_STEP / MAX_BUNNIES_PER_SQUARE... not sure though... maybe TIME_STEP / MAX_BUNNIES_PER_SQUARE^2?? //.05
 #define PANTHER_BIRTH_RATE .1 // as above -- also only fed panthers reproduce, so this number should be higher? -- also since the deathrate is dependent on this, making it too big is bad... maybe we need to have separate death rate??
 
 #define RANDOM_SEEDING 0
@@ -36,19 +36,17 @@
 #define RANDOM_MOVEMENT_EIGHT_WAYS 2 // works
 #define MIGRATION_METHOD RANDOM_MOVEMENT_AVERAGE
 
-#define MOVEMENT_AVERAGE_DAMPENING .17 // the ratio that diagonals have to straight directions -- if this is 0, the model reduces to FOUR_WAYS, if this is 1, the model reduces to EIGHT_WAYS; as this goes to infinity, the bunnies will move solely in diagonals (making a square pattern) -- I think that maybe setting this to the migration rate / 4 might work better?
-
 #define BIRTH_AFTER_DEATH 0 
 #define LOGISTIC_DEATH_AND_BIRTH 1
 #define GOMPERTZ_DEATH_AND_BIRTH 2
 #define LOG_LOGISTIC_DEATH_AND_BIRTH 3 // not yet implemented
-#define SIMULATION_METHOD LOGISTIC_DEATH_AND_BIRTH
+#define SIMULATION_METHOD GOMPERTZ_DEATH_AND_BIRTH
 
 #define OUTPUT_FILENAME "./pics/run.apng" // any filename that has an extension other than .png or .txt should work... if the filename does not have a "." in its name, the program will not work correctly
 #define FRAME_RATE 25
 #define LOOP_ANIMATION true
 #define LOOP_ANIMATION_DELAY 1 // in seconds -- only meaningful if LOOP_ANIMATION is true
-#define DELETE_INTERMEDIATES true
+#define DELETE_INTERMEDIATES false
 #define FILE_COMPRESSIONS 0 // non-negative integer -- default is 15, lower numbers make slightly larger files slightly more quickly
 
 void sig_int_handler(int sig)
@@ -278,33 +276,33 @@ int main()
 	}
 #else // MIGRATION_METHOD == RANDOM_MOTION_AVERAGE or default
 #pragma omp parallel for collapse(2)
-	for(int i = 0; i < XSIZE; i++)
-	{
-	    for(int j = 0; j < YSIZE; j++)
-	    {
-		for(int k = 0; k < 8; k++)
+		for(int i = 0; i < XSIZE; i++)
 		{
-		    std::binomial_distribution<int> binomialDistribution(bunnies[i][j], pow(1 - BUNNY_MIGRATION_PROBABILITY / 4 / (1 + MOVEMENT_AVERAGE_DAMPENING), -(k + 1) / 2) * pow(1 - BUNNY_MIGRATION_PROBABILITY / 4 / (1 + MOVEMENT_AVERAGE_DAMPENING) * MOVEMENT_AVERAGE_DAMPENING, -k / 2) * BUNNY_MIGRATION_PROBABILITY / 4 / (1 + MOVEMENT_AVERAGE_DAMPENING) * ((k + 1) % 2 + (k % 2) * MOVEMENT_AVERAGE_DAMPENING));
-		    int movers = binomialDistribution(rand);
+		    for(int j = 0; j < YSIZE; j++)
+		    {
+			for(int k = 0; k < 8; k++)
+			{
+			    std::binomial_distribution<int> binomialDistribution(bunnies[i][j], pow(1 - BUNNY_MIGRATION_PROBABILITY / 4 / (1 + BUNNY_MIGRATION_PROBABILITY / 4), -(k + 1) / 2) * pow(1 - BUNNY_MIGRATION_PROBABILITY / 4 / (1 + BUNNY_MIGRATION_PROBABILITY / 4) * BUNNY_MIGRATION_PROBABILITY / 4, -k / 2) * BUNNY_MIGRATION_PROBABILITY / 4 / (1 + BUNNY_MIGRATION_PROBABILITY / 4) * ((k + 1) % 2 + (k % 2) * BUNNY_MIGRATION_PROBABILITY / 4));
+			    int movers = binomialDistribution(rand);
 
 #pragma omp atomic
-		    tempBunnies[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] += movers; // this line "magically" gets the right direction
-		    bunnies[i][j] -= movers;
+			    tempBunnies[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] += movers; // this line "magically" gets the right direction
+			    bunnies[i][j] -= movers;
 		    
-		    binomialDistribution = std::binomial_distribution<int>(panthers[i][j], pow(1 - PANTHER_MIGRATION_PROBABILITY / 4 / (1 + MOVEMENT_AVERAGE_DAMPENING), -(k + 1) / 2) * pow(1 - PANTHER_MIGRATION_PROBABILITY / 4 / (1 + MOVEMENT_AVERAGE_DAMPENING) * MOVEMENT_AVERAGE_DAMPENING, -k / 2) * PANTHER_MIGRATION_PROBABILITY / 4 / (1 + MOVEMENT_AVERAGE_DAMPENING) * ((k + 1) % 2 + (k % 2) * MOVEMENT_AVERAGE_DAMPENING));
-		    movers = binomialDistribution(rand);
+			    binomialDistribution = std::binomial_distribution<int>(panthers[i][j], pow(1 - PANTHER_MIGRATION_PROBABILITY / 4 / (1 + PANTHER_MIGRATION_PROBABILITY / 4), -(k + 1) / 2) * pow(1 - PANTHER_MIGRATION_PROBABILITY / 4 / (1 + PANTHER_MIGRATION_PROBABILITY / 4) * PANTHER_MIGRATION_PROBABILITY / 4, -k / 2) * PANTHER_MIGRATION_PROBABILITY / 4 / (1 + PANTHER_MIGRATION_PROBABILITY / 4) * ((k + 1) % 2 + (k % 2) * PANTHER_MIGRATION_PROBABILITY / 4));
+			    movers = binomialDistribution(rand);
 
 #pragma omp atomic
-		    tempPanthers[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] += movers;
-		    panthers[i][j] -= movers;
+			    tempPanthers[(i + XSIZE + (1 - k / 4 * 2) * ((bool) (k % 4))) % XSIZE][(j + YSIZE + (1 - ((k + 2) % 8) / 4 * 2) * ((bool) ((k + 2) % 4))) % YSIZE] += movers;
+			    panthers[i][j] -= movers;
+			}
+
+#pragma omp atomic
+			tempBunnies[i][j] += bunnies[i][j];
+#pragma omp atomic
+			tempPanthers[i][j] += panthers[i][j];
+		    }
 		}
-
-#pragma omp atomic
-		tempBunnies[i][j] += bunnies[i][j];
-#pragma omp atomic
-		tempPanthers[i][j] += panthers[i][j];
-	    }
-	}
 
 #endif
 

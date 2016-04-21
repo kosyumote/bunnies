@@ -11,20 +11,18 @@
 
 #define MAX_BUNNIES_PER_SQUARE 100
 #define MAX_PANTHERS_PER_SQUARE 30
-#define BUNNY_COLOR_STRENGTH 3 // this makes it easy to make the colors more vibrant if your simulation has equilibrium numbers significantly lower than the max allowed per square
-#define PANTHER_COLOR_STRENGTH 3 // this should be 1 by default, and increased to make the colors more visible
 #define XSIZE 50 // 500 x 300
 #define YSIZE 30 // are approximately the dimensions of PA, if each square has a size of 1 km x 1 km 
 #define BUNNY_MIGRATION_PROBABILITY 0.6 // this is the total probability that a bunny moves to a specific square... if this is 0.6, and the default movement method is used, then each direction has a 15% chance
 #define PANTHER_MIGRATION_PROBABILITY 0.8
-#define MAX_STEPS 100
-#define SAMPLING_COARSENESS (XSIZE * YSIZE * 2)
+#define MAX_STEPS 25
+#define SAMPLING_COARSENESS (XSIZE * YSIZE / 5)
 #define HUNGRY_PANTHER_HUNTING_RATE 0.2
-#define FED_PANTHER_HUNTING_RATE 0.01
-#define HUNGRY_PANTHER_DEATH_RATE 0.1
-#define FED_PANTHER_DEATH_RATE 0.03
+#define FED_PANTHER_HUNTING_RATE 0.05 // .01
+#define HUNGRY_PANTHER_DEATH_RATE 0.1 // .1
+#define FED_PANTHER_DEATH_RATE 0.01 // .03
 #define TIME_STEP 1 // monthish
-#define BUNNY_BIRTH_RATE 0.0001 // only meaningful if SIMULATION_METHOD is a DEATH_AND_BIRTH type -- I think it should be around TIME_STEP / MAX_BUNNIES_PER_SQUARE... not sure though... maybe TIME_STEP / MAX_BUNNIES_PER_SQUARE^2??
+#define BUNNY_BIRTH_RATE 0.1 // only meaningful if SIMULATION_METHOD is a DEATH_AND_BIRTH type -- I think it should be around TIME_STEP / MAX_BUNNIES_PER_SQUARE... not sure though... maybe TIME_STEP / MAX_BUNNIES_PER_SQUARE^2?? //.05
 #define PANTHER_BIRTH_RATE .1 // as above -- also only fed panthers reproduce, so this number should be higher? -- also since the deathrate is dependent on this, making it too big is bad... maybe we need to have separate death rate??
 
 #define RANDOM_SEEDING 0
@@ -134,6 +132,8 @@ int main()
 ////////////////////////
 
 	    std::uniform_real_distribution<double> realDistribution(0.0, 1.0);
+	    
+	    int stepsUsed = MAX_STEPS;
 
 	    for(int step = 0; step < MAX_STEPS; step++)
 	    {
@@ -522,6 +522,7 @@ int main()
 		}
 		if(pantherPopulation == 0)
 		{
+		    stepsUsed = step;
 		    step = MAX_STEPS;
 		}
 	    }
@@ -545,7 +546,7 @@ int main()
 		equilibria[INITIAL_BUNNY_POPULATION / SAMPLING_COARSENESS][INITIAL_PANTHER_POPULATION / SAMPLING_COARSENESS] = 2;
 	    }
 
-	    std::cout << "Initial (bunnies, panthers): (" << std::fixed << (double) INITIAL_BUNNY_POPULATION / XSIZE / YSIZE / MAX_BUNNIES_PER_SQUARE << ", " << (double) INITIAL_PANTHER_POPULATION / XSIZE / YSIZE / MAX_PANTHERS_PER_SQUARE << "): equilibrium state " << equilibria[INITIAL_BUNNY_POPULATION / SAMPLING_COARSENESS][INITIAL_PANTHER_POPULATION / SAMPLING_COARSENESS] << " - total simulation time so far: " << simTime.count() << " seconds." << std::endl;
+	    std::cout << "Initial (bunnies, panthers): (" << std::fixed << (double) INITIAL_BUNNY_POPULATION / XSIZE / YSIZE / MAX_BUNNIES_PER_SQUARE << ", " << (double) INITIAL_PANTHER_POPULATION / XSIZE / YSIZE / MAX_PANTHERS_PER_SQUARE << "): equilibrium state " << equilibria[INITIAL_BUNNY_POPULATION / SAMPLING_COARSENESS][INITIAL_PANTHER_POPULATION / SAMPLING_COARSENESS] << " - total simulation time so far: " << simTime.count() << " seconds - " << stepsUsed << " steps" << std::endl;
 
 
 	}
@@ -578,13 +579,13 @@ int main()
     {
 	for(int j = 0; j < (MAX_PANTHERS_PER_SQUARE * XSIZE * YSIZE) / SAMPLING_COARSENESS; j++)
 	{
-	    if(equilibria[i][j] == 0)
+	    if(equilibria[i][(MAX_PANTHERS_PER_SQUARE * XSIZE * YSIZE) / SAMPLING_COARSENESS - j] == 0)
 	    {
 		outputPNG[j][3 * i] = 255;
 		outputPNG[j][3 * i + 1] = 100;
 		outputPNG[j][3 * i + 2] = 100;
 	    }
-	    else if(equilibria[i][j] == 1)
+	    else if(equilibria[i][(MAX_PANTHERS_PER_SQUARE * XSIZE * YSIZE) / SAMPLING_COARSENESS - j] == 1)
 	    {
 		outputPNG[j][3 * i] = 127;
 		outputPNG[j][3 * i + 1] = 127;
